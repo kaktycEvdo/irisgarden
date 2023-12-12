@@ -11,6 +11,8 @@ scikeras = "*"
 keras = "*"
 scikit-learn = "*"
 tensorflow = "*"
+jinja2 = "*"
+python-multipart = "*"
 
 [dev-packages]
 

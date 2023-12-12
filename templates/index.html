@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="{{ url_for('static', path='/styles.css') }}" rel="stylesheet">
+    <title>IRISGARDEN MAIN PAGE</title>
+</head>
+<body>
+    <h1>
+        MODELNAME: {{ model_name }}
+    </h1>
+    <div>
+        MODELLOSS: {{ loss }}
+        MODELACC: {{ acc }}
+        MODELPROGACC: {{ scores }}
+    </div>
+    <form action="model_query" method="POST">
+        <label for="seplength">Пример: 4.6</label>
+        <input type="text" name="seplength" placeholder="Длина наружной доли околоцветника" id="seplength">
+        <label for="sepwidth">Пример: 3.1</label>
+        <input type="text" name="sepwidth" placeholder="Ширина наружной доли околоцветника" id="sepwidth">
+        <label for="petlength">Пример: 1.5</label>
+        <input type="text" name="petlength" placeholder="Длина внутренней доли околоцветника" id="petlength">
+        <label for="petwidth">Пример: 0.2</label>
+        <input type="text" name="petwidth" placeholder="Ширина внутренней доли околоцветника" id="petwidth">
+        <input type="submit" value="Отправить запрос">
+    </form>
+</body>
+</html>

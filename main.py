@@ -1,12 +1,10 @@
-from typing import Union
-
-from fastapi import FastAPI
-
-app = FastAPI()
-
-
+from tabnanny import verbose
+from typing import Dict, Annotated
+from enum import Enum
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI, Request, Form
 import numpy as np
-
 from sklearn.datasets import load_iris
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
@@ -20,8 +18,12 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=DeprecationWarning)
 
 from keras.models import Sequential
-from keras.layers import Dense
+from keras.layers import Dense, Input, Conv2D
 from keras.callbacks import TensorBoard
+
+app = FastAPI()
+templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 iris = load_iris()
 X = iris['data']
@@ -45,15 +47,15 @@ n_classes = Y.shape[1]
 
 def create_model():
     model = Sequential(
-        [Dense(8, input_dim=n_features, activation='relu'),
-         Dense(8, input_dim=n_features, activation='relu'),
+        [Input(shape=(4,)),
+         Dense(16, input_shape=(X_train[0].shape), activation='relu'),
+         Dense(16, activation='relu'),
          Dense(n_classes, activation='softmax')],
-        name="model"
-        )
+        name="model")
 
     model.compile(loss='mse',
-                    optimizer='adam',
-                    metrics=['accuracy'])
+                  optimizer='adam',
+                  metrics=['accuracy'])
     return model
 
 model = create_model()
@@ -67,26 +69,41 @@ cb = TensorBoard()
 print('Имя модели:', model.name)
 history_callback = model.fit(X_train, Y_train,
                                 batch_size=5,
-                                epochs=50,
-                                verbose=0,
+                                epochs=150,
+                                verbose=1,
                                 validation_data=(X_test, Y_test),
                                 callbacks=[cb])
-score = model.evaluate(X_test, Y_test, verbose=0)
-print('Потери при тестировании:', score[0])
-print('Точность тестирования:', score[1])
+score = model.evaluate(X_test, Y_test, verbose=1)
+print('Потери при тестировании: {}'.format(score[0]))
+print('Точность тестирования: {}'.format(score[1]))
 
 
-estimator = KerasClassifier(build_fn=create_model, epochs=100, batch_size=5, verbose=0)
-scores = cross_val_score(estimator, X_scaled, Y, cv=10)
-print("Прогноз : {:0.2f} (+/- {:0.2f})".format(scores.mean(), scores.std()))
+pred = model.predict(X_test)
 
+prognosis_array = np.around(pred) == Y_test
+unique, counts = np.unique(prognosis_array, return_counts=True)
+prognosis_percent = dict(zip(unique, counts))[True] / len(prognosis_array) * 10
+print(str(prognosis_percent)+"%")
+
+
+class ModelData(str, Enum):
+    loss = str(score[0])
+    acc = str(score[1])
+    scores = str(prognosis_percent)+"%"
+    model_name = model.name
 
 
 @app.get("/")
-def read_root():
-    return {"Hello": "World"}
+async def read_root(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request, "loss": ModelData.loss.value, "acc": ModelData.acc.value, "scores": ModelData.scores.value, "model_name": ModelData.model_name.value})
+    
 
+@app.post("/model_query")
+async def process_data(request: Request, seplength: Annotated[str, Form()], sepwidth: Annotated[str, Form()], petlength: Annotated[str, Form()], petwidth: Annotated[str, Form()]):
+    results = model.predict([[float(seplength), float(sepwidth), float(petlength), float(petwidth)]], verbose=1)
+    result = ""
+    if np.around(results)[0][0] == 1: result = "setosa"
+    elif np.around(results)[0][1] == 1: result = "versicolor"
+    elif np.around(results)[0][2] == 1: result = "virginica"
 
-@app.get("/items/{item_id}")
-def read_item(item_id: int, q: Union[str, None] = None):
-    return {"item_id": item_id, "q": q}
+    return templates.TemplateResponse("model_responce.html", {"request": request, "result": result, "loss": ModelData.loss.value, "acc": ModelData.acc.value, "scores": ModelData.scores.value, "model_name": ModelData.model_name.value})
